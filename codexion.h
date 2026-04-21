@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <pthread.h>
 #include <stdlib.h>
+#include <limits.h>
 
 typedef struct s_data t_data;
 typedef struct s_dongle t_dongle;
