@@ -2,6 +2,8 @@
 #include <pthread.h>
 #include <stdlib.h>
 #include <limits.h>
+#include <strings.h>
+#include <stddef.h>
 
 typedef struct s_data t_data;
 typedef struct s_dongle t_dongle;

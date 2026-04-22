@@ -1,9 +1,19 @@
 #include "codexion.h"
 
 
-int is_numeric(char c)
+int is_numeric(char *str)
 {
-	return (c >= '0' && c <= '9');
+	int i;
+
+	i = 0;
+	
+	while(str[i])
+	{
+		if (!(str[i] >= '0' && str[i] <= '9'))
+			return (-1);
+		i++;
+	}
+	return (1);
 }
 
 long long ft_atoi_long(const char *str)
@@ -51,12 +61,20 @@ int parse_args(int argc, char **argv, t_data *data)
 
 	if (argc == 9)
 	{
-		if (!is_numeric(argv[1]))
-			return (-1);
+		int i;
 
-		long coders =  ft_atoi_long(argv[1]);
+		for(i = 1; i <= 7; i++)
+		{
+			if (!is_numeric(argv[i]))
+				return (-1);
+		}
+
+		long coders = ft_atoi_long(argv[1]);
 
 		if (coders <= 0)
 			return (-1);
+
+		data->number_of_coders = coders;
+
 	}
 }
