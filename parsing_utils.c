@@ -1,6 +1,5 @@
 #include "codexion.h"
 
-
 int ft_strlen(char *s)
 {
 	int i;
@@ -12,10 +11,10 @@ int ft_strlen(char *s)
 	return i;
 }
 
-size_t strspn(const char *s1, const char *chars)
+size_t ft_strspn(const char *s1, const char *chars)
 {
 	size_t count;
-	int i;
+	int j;
 
 	count = 0;
 

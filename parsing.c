@@ -1,19 +1,16 @@
 #include "codexion.h"
 
-
 int is_numeric(char *str)
 {
 	int i;
 
 	i = 0;
-	
-	while(str[i])
-	{
-		if (!(str[i] >= '0' && str[i] <= '9'))
-			return (-1);
-		i++;
-	}
-	return (1);
+  if(!str || *str == '\0')
+    return (-1);
+
+  if (ft_strspn(str, "0123456789") == ft_strlen(str))
+    return (1);
+  return (0);
 }
 
 long long ft_atoi_long(const char *str)
@@ -58,23 +55,62 @@ long long ft_atoi_long(const char *str)
 
 int parse_args(int argc, char **argv, t_data *data)
 {
-
 	if (argc == 9)
 	{
 		int i;
 
-		for(i = 1; i <= 7; i++)
+    i = 1;
+		while(i <= 7)
 		{
 			if (!is_numeric(argv[i]))
 				return (-1);
+      i++;
 		}
 
 		long coders = ft_atoi_long(argv[1]);
+    long time_to_burnout = ft_atoi_long(argv[2]);
+    long time_to_compile = ft_atoi_long(argv[3]);
+    long time_to_debug = ft_atoi_long(argv[4]);
+    long time_to_refactor = ft_atoi_long(argv[5]);
+    long number_of_compiles_required = ft_atoi_long(argv[6]);
+    long dongle_cooldown = ft_atoi_long(argv[7]);
 
 		if (coders <= 0)
 			return (-1);
-
 		data->number_of_coders = coders;
 
+    if (time_to_burnout <= 0)
+      return (-1);
+    data->time_to_burnout = time_to_burnout;
+    
+    if (time_to_compile <= 0)
+      return (-1);
+    data->time_to_compile = time_to_compile;
+
+    if (time_to_debug <= 0)
+      return (-1);
+    data->time_to_debug = time_to_debug;
+
+    if (time_to_refactor <= 0)
+      return (-1);
+    data->time_to_refactor = time_to_refactor;
+
+    if (number_of_compiles_required < 1)
+      return (-1);
+    data->number_of_compiles_required = number_of_compiles_required;
+
+    if (dongle_cooldown < 0)
+      return (-1);
+    data->dongle_cooldown = dongle_cooldown;
+
+    if(strcmp(argv[8], "fifo") == 0)
+      data->scheduler = FIFO;
+    else if(strcmp(argv[8], "edf") == 0)
+      data->scheduler = EDF;
+    else
+     return (-1);
+
+    return (0);
 	}
+  return (-1);
 }

@@ -2,12 +2,19 @@
 #include <pthread.h>
 #include <stdlib.h>
 #include <limits.h>
-#include <strings.h>
+#include <string.h>
 #include <stddef.h>
 
 typedef struct s_data t_data;
 typedef struct s_dongle t_dongle;
 typedef struct s_coders t_coders;
+
+
+typedef enum s_scheduler
+{
+  FIFO,
+  EDF
+} t_scheduler;
 
 typedef struct s_data
 {
@@ -46,7 +53,6 @@ typedef struct s_coders
   t_data *data;
 } t_coders;
 
-typedef enum s_scheduler{
-  FIFO,
-  EDF
-} t_scheduler;
+int ft_strlen(char *s);
+size_t ft_strspn(const char *s1, const char *chars);
+
