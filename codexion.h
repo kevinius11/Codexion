@@ -1,9 +1,22 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   codexion.h                                         :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: kcastro- <marvin@42.fr>                    +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2026/04/23 18:07:04 by kcastro-          #+#    #+#             */
+/*   Updated: 2026/04/23 18:07:28 by kcastro-         ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
 #include <stdio.h>
 #include <pthread.h>
 #include <stdlib.h>
 #include <limits.h>
 #include <string.h>
 #include <stddef.h>
+#include <sys/time.h>
 
 typedef struct s_data t_data;
 typedef struct s_dongle t_dongle;

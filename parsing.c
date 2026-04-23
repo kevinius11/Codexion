@@ -1,3 +1,15 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   parsing.c                                          :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: kcastro- <marvin@42.fr>                    +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2026/04/23 18:04:04 by kcastro-          #+#    #+#             */
+/*   Updated: 2026/04/23 18:04:17 by kcastro-         ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
 #include "codexion.h"
 
 int is_numeric(char *str)
@@ -59,58 +71,58 @@ int parse_args(int argc, char **argv, t_data *data)
 	{
 		int i;
 
-    i = 1;
+    		i = 1;
 		while(i <= 7)
 		{
 			if (!is_numeric(argv[i]))
 				return (-1);
-      i++;
+      			i++;
 		}
 
 		long coders = ft_atoi_long(argv[1]);
-    long time_to_burnout = ft_atoi_long(argv[2]);
-    long time_to_compile = ft_atoi_long(argv[3]);
-    long time_to_debug = ft_atoi_long(argv[4]);
-    long time_to_refactor = ft_atoi_long(argv[5]);
-    long number_of_compiles_required = ft_atoi_long(argv[6]);
-    long dongle_cooldown = ft_atoi_long(argv[7]);
+    		long time_to_burnout = ft_atoi_long(argv[2]);
+    		long time_to_compile = ft_atoi_long(argv[3]);
+    		long time_to_debug = ft_atoi_long(argv[4]);
+    		long time_to_refactor = ft_atoi_long(argv[5]);
+    		long number_of_compiles_required = ft_atoi_long(argv[6]);
+    		long dongle_cooldown = ft_atoi_long(argv[7]);
 
 		if (coders <= 0)
 			return (-1);
 		data->number_of_coders = coders;
 
-    if (time_to_burnout <= 0)
-      return (-1);
-    data->time_to_burnout = time_to_burnout;
+    		if (time_to_burnout <= 0)
+      			return (-1);
+    		data->time_to_burnout = time_to_burnout;
     
-    if (time_to_compile <= 0)
-      return (-1);
-    data->time_to_compile = time_to_compile;
+	    	if (time_to_compile <= 0)
+      			return (-1);
+    		data->time_to_compile = time_to_compile;
 
-    if (time_to_debug <= 0)
-      return (-1);
-    data->time_to_debug = time_to_debug;
+    		if (time_to_debug <= 0)
+      			return (-1);
+    		data->time_to_debug = time_to_debug;
 
-    if (time_to_refactor <= 0)
-      return (-1);
-    data->time_to_refactor = time_to_refactor;
+    		if (time_to_refactor <= 0)
+      			return (-1);
+    		data->time_to_refactor = time_to_refactor;
 
-    if (number_of_compiles_required < 1)
-      return (-1);
-    data->number_of_compiles_required = number_of_compiles_required;
+    		if (number_of_compiles_required < 1)
+      			return (-1);
+    		data->number_of_compiles_required = number_of_compiles_required;
 
-    if (dongle_cooldown < 0)
-      return (-1);
-    data->dongle_cooldown = dongle_cooldown;
+   	 	if (dongle_cooldown < 0)
+      			return (-1);
+    		data->dongle_cooldown = dongle_cooldown;
 
-    if(strcmp(argv[8], "fifo") == 0)
-      data->scheduler = FIFO;
-    else if(strcmp(argv[8], "edf") == 0)
-      data->scheduler = EDF;
-    else
-     return (-1);
+  	  	if(strcmp(argv[8], "fifo") == 0)
+      			data->scheduler = FIFO;
+    		else if(strcmp(argv[8], "edf") == 0)
+      			data->scheduler = EDF;
+    		else
+     			return (-1);
 
-    return (0);
+    	return (0);
 	}
   return (-1);
 }
