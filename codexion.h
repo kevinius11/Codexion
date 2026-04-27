@@ -17,6 +17,7 @@
 #include <string.h>
 #include <stddef.h>
 #include <sys/time.h>
+#include <unistd.h>
 
 typedef struct s_data t_data;
 typedef struct s_dongle t_dongle;
