@@ -24,7 +24,10 @@ int init_data(t_data *data)
 void free_resources(t_data *data, int count)
 {
 	int i;
-	
+
+	if (!data)
+		return ;
+
 	i = 0;
 	while ( i < count)
 	{
@@ -32,30 +35,45 @@ void free_resources(t_data *data, int count)
 		pthread_mutex_destroy(&data->dongles[i].mutex);
 		i++;
 	}
+	
+	pthread_mutex_destroy(&data->log_mutex);
+	pthread_mutex_destroy(&data->sim_mutex);
+
+	if (data->threads)
+	{
+		free(data->threads);
+		data->threads = NULL;
+	}
 	if (data->dongles)
 	{
 		free(data->dongles);
 		data->dongles = NULL;
-	}
+	}	
 	if (data->coders)
 	{
 		free(data->coders);
 		data->coders = NULL;
 	}
-}
+}	
 
 int init_simulation_dynamic(t_data *data)
 {
 	int i ;
+	
+	data->threads = malloc(sizeof(pthread_t) * data->number_of_coders);
+	if(!data->threads)
+		return (-1);
 
 	data->dongles = malloc(sizeof(t_dongle) * data->number_of_coders);
 	if (!data->dongles)
-		return (-1);
-
-	data->coders = malloc(sizeof(t_coder) * data->number_of_coders);
-	if (!data->coders)
 	{
-		free(data->dongles);
+		free(data->threads);
+		return (-1);
+	}
+	data->coders = malloc(sizeof(t_coders) * data->number_of_coders);
+	if (!data->coders)
+	{	
+		free_resources(data, 0);
 		return (-1);
 	}
 	i = 0;

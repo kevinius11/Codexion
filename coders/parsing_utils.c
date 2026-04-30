@@ -1,0 +1,49 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   parsing_utils.c                                    :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: kcastro- <marvin@42.fr>                    +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2026/04/23 18:05:09 by kcastro-          #+#    #+#             */
+/*   Updated: 2026/04/23 18:05:14 by kcastro-         ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
+#include "codexion.h"
+
+int ft_strlen(char *s)
+{
+	int i;
+
+	i = 0;
+
+	while(s[i])
+		i++;
+	return i;
+}
+
+size_t ft_strspn(const char *s1, const char *chars)
+{
+	size_t count;
+	int j;
+
+	count = 0;
+
+	while(s1[count])
+	{
+		j = 0;
+		while(chars[j] != '\0')
+		{
+			if (s1[count] == chars[j])
+				break;
+			j++;
+		}
+		
+		if (chars[j] == '\0')
+			break;
+
+		count++;
+	}
+	return count;
+}

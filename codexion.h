@@ -43,6 +43,7 @@ typedef struct s_data
   int simulation_over;
   pthread_mutex_t log_mutex;
   pthread_mutex_t sim_mutex;
+  pthread_t *threads;
   t_dongle *dongles;
   t_coders *coders;
   t_scheduler scheduler;
@@ -59,7 +60,7 @@ typedef struct s_dongle
 
 typedef struct s_coders
 {
-  int id;
+  int id; 
   long last_compilation;
   int compilation_count;
   t_dongle *left;
@@ -69,4 +70,12 @@ typedef struct s_coders
 
 int ft_strlen(char *s);
 size_t ft_strspn(const char *s1, const char *chars);
-
+void *coder_routine(void *arg);
+long get_time_ms(void);
+int init_data(t_data *data);
+void free_resources(t_data *data, int count);
+int init_simulation_dynamic(t_data *data);
+int is_numeric(char *str);
+long long ft_atoi_long(const char *str);
+int parse_args(int argc, char **argv, t_data *data);
+int main(int argc, char **argv);

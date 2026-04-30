@@ -20,7 +20,7 @@ int is_numeric(char *str)
   if(!str || *str == '\0')
     return (-1);
 
-  if (ft_strspn(str, "0123456789") == ft_strlen(str))
+  if (ft_strspn(str, "0123456789") == (size_t)ft_strlen(str))
     return (1);
   return (0);
 }

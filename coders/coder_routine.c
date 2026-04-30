@@ -1,48 +1,27 @@
 /* ************************************************************************** */
 /*                                                                            */
 /*                                                        :::      ::::::::   */
-/*   parsing_utils.c                                    :+:      :+:    :+:   */
+/*   coder_routine.c                                    :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
 /*   By: kcastro- <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
-/*   Created: 2026/04/23 18:05:09 by kcastro-          #+#    #+#             */
-/*   Updated: 2026/04/23 18:05:14 by kcastro-         ###   ########.fr       */
+/*   Created: 2026/04/30 18:24:43 by kcastro-          #+#    #+#             */
+/*   Updated: 2026/04/30 18:24:46 by kcastro-         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "codexion.h"
 
-int ft_strlen(char *s)
+void *coder_routine(void *arg)
 {
-	int i;
+	t_coders *coder = (t_coders *)arg;
 
-	i = 0;
-
-	while(s[i])
-		i++;
-	return i;
-}
-
-size_t ft_strspn(const char *s1, const char *chars)
-{
-	size_t count;
-	int j;
-
-	count = 0;
-
-	while(s1[count])
+	int acciones = 0;
+	while (acciones < 5)
 	{
-		j = 0;
-		while(chars[j] != '\0')
-		{
-			if (s1[count] == chars[j])
-				break;
-		}
-		
-		if (chars[j] == '\0')
-			break;
-
-		count++;
+		printf("Coder %d haciendo accion %d\n", coder->id, acciones);
+		usleep(200000);
+		acciones++;
 	}
-	return count;
+	return NULL;
 }
