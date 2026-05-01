@@ -12,16 +12,96 @@
 
 #include "codexion.h"
 
+void	print_status(t_data *data, int id, char *status)
+{
+	pthread_mutex_lock(&data->log_mutex);
+	if (!data->simulation_over)
+	{
+		printf("%ld %d %s\n", get_time_ms() - data->start_time, id, status);
+	}
+	pthread_mutex_unlock(&data->log_mutex);
+}
+
+void	take_dongle(t_coders *coder, t_dongle *dongle)
+{
+	pthread_mutex_lock(&dongle->mutex);
+	
+	while (!dongle->available || (get_time_ms() - dongle->last_used_time) < coder->data->dongle_cooldown)
+		pthread_cond_wait(&dongle->cond, &dongle->mutex);
+
+	dongle->available = 0;
+
+	pthread_mutex_unlock(&dongle->mutex);
+	print_status(coder->data, coder->id, "has taken a dongle");
+}
+
+void	release_dongle(t_dongle *dongle)
+{
+	pthread_mutex_lock(&dongle->mutex);
+	dongle->available = 1;
+	dongle->last_used_time = get_time_ms();
+	pthread_cond_broadcast(&dongle->cond);
+	pthread_mutex_unlock(&dongle->mutex);
+}
+
 void *coder_routine(void *arg)
 {
 	t_coders *coder = (t_coders *)arg;
+	t_data *data = coder->data;
+	t_dongle *first;
+	t_dongle *second;
 
-	int acciones = 0;
-	while (acciones < 5)
+	while (1)
 	{
-		printf("Coder %d haciendo accion %d\n", coder->id, acciones);
-		usleep(200000);
-		acciones++;
+		pthread_mutex_lock(&data->sim_mutex);
+		if (data->simulation_over || coder->compilation_count >= data->number_of_compiles_required)
+		{
+			pthread_mutex_unlock(&data->sim_mutex);
+			break;
+		}
+		pthread_mutex_unlock(&data->sim_mutex);
+
+		if (coder->id == 1)
+		{
+			first = coder->right;
+			second = coder->left;
+		}
+		else
+		{
+			first = coder->left;
+			second = coder->right;
+		}
+
+		pthread_mutex_lock(&data->compile_mutex);
+		while (data->compiling_count >= data->number_of_coders / 2)
+    			pthread_cond_wait(&data->compile_cond, &data->compile_mutex);
+		data->compiling_count++;
+		pthread_mutex_unlock(&data->compile_mutex);
+
+		take_dongle(coder, first);
+		take_dongle(coder, second);
+		coder->last_compilation = get_time_ms();
+		print_status(data, coder->id, "is compiling");
+
+		usleep(data->time_to_compile * 1000);
+
+		pthread_mutex_lock(&data->sim_mutex);
+		coder->compilation_count++;
+		pthread_mutex_unlock(&data->sim_mutex);
+
+		release_dongle(first);
+		release_dongle(second);
+		
+		pthread_mutex_lock(&data->compile_mutex);
+		data->compiling_count--;
+		pthread_cond_broadcast(&data->compile_cond);
+		pthread_mutex_unlock(&data->compile_mutex);
+
+		print_status(data, coder->id, "is debugging");
+        	usleep(data->time_to_debug * 1000);
+
+		print_status(data, coder->id, "is refactoring");
+        	usleep(data->time_to_refactor * 1000);
 	}
-	return NULL;
+	return (NULL);
 }

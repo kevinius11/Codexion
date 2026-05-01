@@ -8,16 +8,19 @@ long get_time_ms(void)
 	return (tv.tv_sec * 1000 + tv.tv_usec / 1000);
 }
 
-int init_data(t_data *data)
+int	init_data(t_data *data)
 {
 	if (pthread_mutex_init(&data->log_mutex, NULL) != 0)
 		return (-1);
 	if (pthread_mutex_init(&data->sim_mutex, NULL) != 0)
 		return (-1);
-
+	if (pthread_mutex_init(&data->compile_mutex, NULL) != 0)
+		return (-1);
+	if (pthread_cond_init(&data->compile_cond, NULL) != 0)
+		return (-1);
 	data->simulation_over = 0;
+	data->compiling_count = 0;
 	data->start_time = get_time_ms();
-
 	return (0);
 }
 
@@ -93,6 +96,8 @@ int init_simulation_dynamic(t_data *data)
 		}
 
 		data->dongles[i].id = i;
+		data->dongles[i].available = 1;
+		data->dongles[i].last_used_time = 0;
 
 		data->coders[i].id = i + 1;
 		data->coders[i].data = data;

@@ -41,6 +41,9 @@ typedef struct s_data
   long dongle_cooldown;
   long start_time;
   int simulation_over;
+  int compiling_count;
+  pthread_mutex_t compile_mutex;
+  pthread_cond_t compile_cond;
   pthread_mutex_t log_mutex;
   pthread_mutex_t sim_mutex;
   pthread_t *threads;
@@ -56,6 +59,7 @@ typedef struct s_dongle
   pthread_cond_t cond;
   long cooldown;
   long last_used_time;
+  int available;
 } t_dongle;
 
 typedef struct s_coders
@@ -77,5 +81,7 @@ void free_resources(t_data *data, int count);
 int init_simulation_dynamic(t_data *data);
 int is_numeric(char *str);
 long long ft_atoi_long(const char *str);
+void print_status(t_data *data, int id, char *status);
+void *monitor_routine(void *arg);
 int parse_args(int argc, char **argv, t_data *data);
 int main(int argc, char **argv);

@@ -7,7 +7,8 @@ SRC         = main.c \
               coders/coder_routine.c \
               coders/init_variables.c \
               coders/parsing.c \
-              coders/parsing_utils.c
+              coders/parsing_utils.c \
+	      coders/monitor_routine.c
 
 OBJ_DIR     = obj
 # Esta línea transforma 'coders/archivo.c' en 'obj/coders/archivo.o'

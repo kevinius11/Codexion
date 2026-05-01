@@ -16,16 +16,13 @@ int main(int argc, char **argv)
 {
 	t_data data;
 	int i;
-
-    	printf("DEBUG: Iniciando programa con %d argumentos\n", argc);
-	fflush(stdout); 
+	pthread_t monitor;
+ 
    	if (parse_args(argc, argv, &data) != 0)
     	{
         	printf("ERROR: El parseo falló. Revisa los valores introducidos.\n");
         	return (1);
     	}
-    
-    	printf("DEBUG: Parseo exitoso. Coders: %d\n", data.number_of_coders);
 
 	if (init_data(&data) != 0)
 		return (1);
@@ -48,8 +45,14 @@ int main(int argc, char **argv)
 		i++;
 	}
 
-	i = 0;
+	if (pthread_create(&monitor, NULL, &monitor_routine, &data) != 0)
+	{
+		printf("Error creando el monitor \n");
+	}
+	
+	pthread_join(monitor, NULL);
 
+	i = 0;
 	while (i < data.number_of_coders)
 	{
 		pthread_join(data.threads[i], NULL);
