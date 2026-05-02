@@ -24,15 +24,31 @@ void	print_status(t_data *data, int id, char *status)
 
 void	take_dongle(t_coders *coder, t_dongle *dongle)
 {
-	pthread_mutex_lock(&dongle->mutex);
-	
-	while (!dongle->available || (get_time_ms() - dongle->last_used_time) < coder->data->dongle_cooldown)
-		pthread_cond_wait(&dongle->cond, &dongle->mutex);
+	    struct timeval  tv;
+	    struct timespec ts;
+	    long            remaining;
 
-	dongle->available = 0;
-
-	pthread_mutex_unlock(&dongle->mutex);
-	print_status(coder->data, coder->id, "has taken a dongle");
+	    pthread_mutex_lock(&dongle->mutex);
+	    while (!dongle->available
+        	|| (get_time_ms() - dongle->last_used_time) < coder->data->dongle_cooldown)
+	    {
+            remaining = coder->data->dongle_cooldown
+               - (get_time_ms() - dongle->last_used_time);
+	    if (remaining <= 0)
+		    remaining = 1;
+	    gettimeofday(&tv, NULL);
+	    ts.tv_sec = tv.tv_sec + (remaining / 1000);
+	    ts.tv_nsec = (tv.tv_usec * 1000) + ((remaining % 1000) * 1000000);
+	    if (ts.tv_nsec >= 1000000000)
+	    {
+		    ts.tv_sec += 1;
+		    ts.tv_nsec -= 1000000000;
+	    }
+	    pthread_cond_timedwait(&dongle->cond, &dongle->mutex, &ts);
+	    }
+	    dongle->available = 0;
+	    pthread_mutex_unlock(&dongle->mutex);
+	    print_status(coder->data, coder->id, "has taken a dongle");
 }
 
 void	release_dongle(t_dongle *dongle)
@@ -51,8 +67,9 @@ void *coder_routine(void *arg)
 	t_dongle *first;
 	t_dongle *second;
 
+	usleep(coder->id * 1000);
 	while (1)
-	{
+	{	
 		pthread_mutex_lock(&data->sim_mutex);
 		if (data->simulation_over || coder->compilation_count >= data->number_of_compiles_required)
 		{
@@ -72,12 +89,6 @@ void *coder_routine(void *arg)
 			second = coder->right;
 		}
 
-		pthread_mutex_lock(&data->compile_mutex);
-		while (data->compiling_count >= data->number_of_coders / 2)
-    			pthread_cond_wait(&data->compile_cond, &data->compile_mutex);
-		data->compiling_count++;
-		pthread_mutex_unlock(&data->compile_mutex);
-
 		take_dongle(coder, first);
 		take_dongle(coder, second);
 		coder->last_compilation = get_time_ms();
@@ -92,11 +103,6 @@ void *coder_routine(void *arg)
 		release_dongle(first);
 		release_dongle(second);
 		
-		pthread_mutex_lock(&data->compile_mutex);
-		data->compiling_count--;
-		pthread_cond_broadcast(&data->compile_cond);
-		pthread_mutex_unlock(&data->compile_mutex);
-
 		print_status(data, coder->id, "is debugging");
         	usleep(data->time_to_debug * 1000);
 

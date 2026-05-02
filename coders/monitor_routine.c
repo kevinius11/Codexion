@@ -29,7 +29,11 @@ void	*monitor_routine(void *arg)
 			{
 				data->simulation_over = 1;
 				pthread_mutex_unlock(&data->sim_mutex);
-				print_status(data, data->coders[i].id, "died of burnout");
+				pthread_mutex_lock(&data->log_mutex);
+				printf("%ld %d burned out\n", 
+    				get_time_ms() - data->start_time, 
+    				data->coders[i].id);
+				pthread_mutex_unlock(&data->log_mutex);
 				return (NULL);
 			}
 
