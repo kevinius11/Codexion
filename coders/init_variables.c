@@ -17,7 +17,7 @@ int	init_data(t_data *data)
 	if (pthread_mutex_init(&data->compile_mutex, NULL) != 0)
 		return (-1);
 	if (pthread_cond_init(&data->compile_cond, NULL) != 0)
-		return (-1);
+		return (0);
 	data->simulation_over = 0;
 	data->compiling_count = 0;
 	data->start_time = get_time_ms();
@@ -57,6 +57,17 @@ void free_resources(t_data *data, int count)
 		free(data->coders);
 		data->coders = NULL;
 	}
+
+	if (data->dongles)
+	{
+		i = 0;
+		while (i < count)
+		{
+			if (data->dongles[i].queue.waiters)
+				free(data->dongles[i].queue.waiters);
+			i++;
+		}
+	}
 }	
 
 int init_simulation_dynamic(t_data *data)
@@ -79,8 +90,8 @@ int init_simulation_dynamic(t_data *data)
 		free_resources(data, 0);
 		return (-1);
 	}
-	i = 0;
 
+	i = 0;
 	while( i < data->number_of_coders)
 	{
 		if(pthread_mutex_init(&data->dongles[i].mutex, NULL) != 0)
@@ -94,6 +105,16 @@ int init_simulation_dynamic(t_data *data)
 			free_resources(data, i);
 			return (-1);
 		}
+
+		data->dongles[i].queue.waiters = malloc(sizeof(t_waiter) * data->number_of_coders);
+		if (!data->dongles[i].queue.waiters)
+		{
+			free_resources(data, 0);
+			return (-1);
+		}
+	
+		data->dongles[i].queue.size = 0;
+		data->dongles[i].queue.capacity = data->number_of_coders;
 
 		data->dongles[i].id = i;
 		data->dongles[i].available = 1;

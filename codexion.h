@@ -85,6 +85,9 @@ typedef struct s_coders
   t_data	*data;
 }	t_coders;
 
+t_waiter	heap_peek(t_heap *heap);
+t_waiter	heap_extract_min(t_heap *heap);
+void	heap_insert(t_heap *heap, t_waiter new);
 int	ft_strlen(char *s);
 size_t	ft_strspn(const char *s1, const char *chars);
 void	*coder_routine(void *arg);
