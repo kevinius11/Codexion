@@ -17,7 +17,7 @@ int	init_data(t_data *data)
 	if (pthread_mutex_init(&data->compile_mutex, NULL) != 0)
 		return (-1);
 	if (pthread_cond_init(&data->compile_cond, NULL) != 0)
-		return (0);
+		return (-1);
 	data->simulation_over = 0;
 	data->compiling_count = 0;
 	data->start_time = get_time_ms();
@@ -36,12 +36,18 @@ void free_resources(t_data *data, int count)
 	{
 		pthread_cond_destroy(&data->dongles[i].cond);
 		pthread_mutex_destroy(&data->dongles[i].mutex);
+		if (data->dongles[i].queue.waiters)
+		{
+			free(data->dongles[i].queue.waiters);
+			data->dongles[i].queue.waiters = NULL;
+		}
 		i++;
 	}
 	
 	pthread_mutex_destroy(&data->log_mutex);
 	pthread_mutex_destroy(&data->sim_mutex);
-
+	pthread_mutex_destroy(&data->compile_mutex);
+	pthread_cond_destroy(&data->compile_cond);
 	if (data->threads)
 	{
 		free(data->threads);
@@ -56,18 +62,7 @@ void free_resources(t_data *data, int count)
 	{
 		free(data->coders);
 		data->coders = NULL;
-	}
-
-	if (data->dongles)
-	{
-		i = 0;
-		while (i < count)
-		{
-			if (data->dongles[i].queue.waiters)
-				free(data->dongles[i].queue.waiters);
-			i++;
-		}
-	}
+	}	
 }	
 
 int init_simulation_dynamic(t_data *data)
@@ -124,7 +119,10 @@ int init_simulation_dynamic(t_data *data)
 		data->coders[i].data = data;
 
 		data->coders[i].right = &data->dongles[i];
-		data->coders[i].left = &data->dongles[(i - 1 + data->number_of_coders) % data->number_of_coders];
+		if (data->number_of_coders == 1)
+			data->coders[i].left = &data->dongles[i];
+		else
+			data->coders[i].left = &data->dongles[(i - 1 + data->number_of_coders) % data->number_of_coders];
 
 		data->coders[i].compilation_count = 0;
 		data->coders[i].last_compilation = data->start_time;

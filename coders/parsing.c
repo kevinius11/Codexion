@@ -14,15 +14,11 @@
 
 int is_numeric(char *str)
 {
-	int i;
-
-	i = 0;
-  if(!str || *str == '\0')
-    return (-1);
-
-  if (ft_strspn(str, "0123456789") == (size_t)ft_strlen(str))
-    return (1);
-  return (0);
+ 	 if(!str || *str == '\0')
+    		return (-1);
+	 if (ft_strspn(str, "0123456789") == (size_t)ft_strlen(str))
+		 return (1);
+	 return (0);
 }
 
 long long ft_atoi_long(const char *str)

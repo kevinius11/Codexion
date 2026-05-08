@@ -17,6 +17,7 @@
 #include <string.h>
 #include <stddef.h>
 #include <sys/time.h>
+#include <time.h>
 #include <unistd.h>
 
 typedef struct s_data t_data;
@@ -87,6 +88,7 @@ typedef struct s_coders
 
 t_waiter	heap_peek(t_heap *heap);
 t_waiter	heap_extract_min(t_heap *heap);
+void	heap_remove_by_id(t_heap *heap, int coder_id);
 void	heap_insert(t_heap *heap, t_waiter new);
 int	ft_strlen(char *s);
 size_t	ft_strspn(const char *s1, const char *chars);
