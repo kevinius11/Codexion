@@ -26,6 +26,18 @@ static void	broadcast_all_dongles(t_data *data)
 	}
 }
 
+/*
+** FIX PROBLEMA 1 (orden de locks):
+** El burnout printf usa log_mutex → sim_mutex, igual que print_status.
+** Orden consistente en TODO el programa: log_mutex siempre antes que sim_mutex.
+** Esto evita deadlock por inversión de orden de adquisición.
+**
+** FIX PROBLEMA 5 (monitor agresivo):
+** usleep subido a 2000µs. Con burnout mínimo razonable de ~200ms,
+** 2ms de granularidad da precisión más que suficiente para el requisito
+** de detectar burnout en <10ms, mientras reduce a la mitad los wakeups
+** del monitor comparado con 1000µs.
+*/
 void	*monitor_routine(void *arg)
 {
 	t_data	*data;
@@ -55,9 +67,11 @@ void	*monitor_routine(void *arg)
 					data->simulation_over = 1;
 					pthread_mutex_unlock(&data->sim_mutex);
 					pthread_mutex_lock(&data->log_mutex);
+					pthread_mutex_lock(&data->sim_mutex);
 					printf("%ld %d burned out\n",
 						get_time_ms() - data->start_time,
 						data->coders[i].id);
+					pthread_mutex_unlock(&data->sim_mutex);
 					pthread_mutex_unlock(&data->log_mutex);
 					broadcast_all_dongles(data);
 					return (NULL);
@@ -73,7 +87,7 @@ void	*monitor_routine(void *arg)
 			return (NULL);
 		}
 		pthread_mutex_unlock(&data->sim_mutex);
-		usleep(1000);
+		usleep(2000);
 	}
 	return (NULL);
 }

@@ -12,17 +12,22 @@
 
 #include "codexion.h"
 
+/*
+** FIX PROBLEMA 1:
+** log_mutex y sim_mutex se adquieren SIEMPRE en el mismo orden:
+**   log_mutex → sim_mutex
+** Esto elimina la ventana entre "comprobé simulation_over" y "hice printf"
+** donde el monitor podía activar simulation_over y el coder imprimía igual.
+** Al mantener ambos locks durante el printf, o imprimimos dentro de la
+** simulación activa, o no imprimimos en absoluto. Sin ventana posible.
+*/
 void	print_status(t_data *data, int id, char *status)
 {
-	pthread_mutex_lock(&data->sim_mutex);
-	if (data->simulation_over)
-	{
-		pthread_mutex_unlock(&data->sim_mutex);
-		return ;
-	}
-	pthread_mutex_unlock(&data->sim_mutex);
 	pthread_mutex_lock(&data->log_mutex);
-	printf("%ld %d %s\n", get_time_ms() - data->start_time, id, status);
+	pthread_mutex_lock(&data->sim_mutex);
+	if (!data->simulation_over)
+		printf("%ld %d %s\n", get_time_ms() - data->start_time, id, status);
+	pthread_mutex_unlock(&data->sim_mutex);
 	pthread_mutex_unlock(&data->log_mutex);
 }
 
@@ -48,18 +53,6 @@ static long	make_ticket_timestamp(t_coders *coder)
 	return (ts);
 }
 
-/*
-** Comprueba si el dongle es adquirible AHORA por este coder.
-** Debe llamarse con dongle->mutex ya tomado.
-**
-** Condiciones necesarias:
-**   1. dongle->available == 1           (nadie lo tiene)
-**   2. cooldown expirado                (tiempo desde liberacion >= cooldown)
-**   3. este coder es el top del heap    (politica de prioridad FIFO/EDF)
-**
-** Separar esta funcion de la adquisicion elimina el TOCTOU: la
-** comprobacion y la toma ocurren bajo el mismo lock sin soltarlo entre medias.
-*/
 static int	dongle_is_acquirable(t_dongle *dongle, t_coders *coder)
 {
 	long	elapsed;
@@ -78,64 +71,44 @@ static int	dongle_is_acquirable(t_dongle *dongle, t_coders *coder)
 }
 
 /*
-** try_take_dongle — adquisicion NO bloqueante.
+** FIX PROBLEMA 2 y 3:
+** Ticket ownership explícito con flag 'inserted'.
+** El ticket se inserta UNA SOLA VEZ y se elimina exactamente una vez,
+** siempre con heap_remove_by_id(coder->id), nunca con heap_extract_min.
 **
-** Toma el mutex, inserta ticket en la cola de prioridad, comprueba
-** inmediatamente si puede adquirir. Si puede: lo marca como no disponible,
-** extrae el ticket del heap y devuelve 1. Si no puede: elimina el ticket
-** del heap (sin dejar zombie) y devuelve 0.
+** ¿Por qué heap_remove_by_id en vez de heap_extract_min en el caso exitoso?
+** heap_extract_min asume que "si soy adquirible, soy el top del heap".
+** Aunque dongle_is_acquirable comprueba heap_peek == coder->id antes de
+** adquirir, cualquier corrupción futura podría extraer el ticket de otro
+** coder. heap_remove_by_id busca por ID explícito: sabemos quiénes somos,
+** no necesitamos asumir que seguimos siendo el mínimo en el instante exacto
+** de la extracción.
 **
-** No hace ningun wait. Retorna siempre de inmediato.
-** Esto garantiza que nunca hay hold-and-wait: si falla, el coder
-** no retiene ningun recurso mientras espera.
-*/
-static int	try_take_dongle(t_coders *coder, t_dongle *dongle)
-{
-	t_waiter	ticket;
-	int		acquired;
-
-	ticket.coder_id = coder->id;
-	ticket.timestamp = make_ticket_timestamp(coder);
-	pthread_mutex_lock(&dongle->mutex);
-	heap_insert(&dongle->queue, ticket);
-	acquired = dongle_is_acquirable(dongle, coder);
-	if (acquired)
-	{
-		heap_extract_min(&dongle->queue);
-		dongle->available = 0;
-	}
-	else
-		heap_remove_by_id(&dongle->queue, coder->id);
-	pthread_mutex_unlock(&dongle->mutex);
-	if (acquired)
-		print_status(coder->data, coder->id, "has taken a dongle");
-	return (acquired);
-}
-
-/*
-** wait_for_dongle — espera bloqueante sobre UN dongle hasta que
-** sea adquirible o la simulacion termine.
-**
-** Solo se llama cuando el coder no retiene ningun otro recurso,
-** por lo que no hay hold-and-wait.
-** Usa timedwait para auto-despertarse cuando el cooldown expira,
-** sin depender exclusivamente de broadcasts externos.
+** El flag 'inserted' garantiza que no haya doble-remove si el hilo
+** es cancelado por simulation_over en ramas distintas del bucle.
 */
 static int	wait_for_dongle(t_coders *coder, t_dongle *dongle)
 {
 	t_waiter		ticket;
 	long			remaining;
 	struct timespec	ts;
+	int			inserted;
 
 	ticket.coder_id = coder->id;
 	ticket.timestamp = make_ticket_timestamp(coder);
+	inserted = 0;
 	pthread_mutex_lock(&dongle->mutex);
 	heap_insert(&dongle->queue, ticket);
+	inserted = 1;
 	while (1)
 	{
 		if (is_sim_over(coder->data))
 		{
-			heap_remove_by_id(&dongle->queue, coder->id);
+			if (inserted)
+			{
+				heap_remove_by_id(&dongle->queue, coder->id);
+				inserted = 0;
+			}
 			pthread_mutex_unlock(&dongle->mutex);
 			return (0);
 		}
@@ -160,11 +133,34 @@ static int	wait_for_dongle(t_coders *coder, t_dongle *dongle)
 		else
 			pthread_cond_wait(&dongle->cond, &dongle->mutex);
 	}
-	heap_extract_min(&dongle->queue);
+	if (inserted)
+	{
+		heap_remove_by_id(&dongle->queue, coder->id);
+		inserted = 0;
+	}
 	dongle->available = 0;
 	pthread_mutex_unlock(&dongle->mutex);
 	print_status(coder->data, coder->id, "has taken a dongle");
 	return (1);
+}
+
+static int	try_take_dongle(t_coders *coder, t_dongle *dongle)
+{
+	t_waiter	ticket;
+	int		acquired;
+
+	ticket.coder_id = coder->id;
+	ticket.timestamp = make_ticket_timestamp(coder);
+	pthread_mutex_lock(&dongle->mutex);
+	heap_insert(&dongle->queue, ticket);
+	acquired = dongle_is_acquirable(dongle, coder);
+	heap_remove_by_id(&dongle->queue, coder->id);
+	if (acquired)
+		dongle->available = 0;
+	pthread_mutex_unlock(&dongle->mutex);
+	if (acquired)
+		print_status(coder->data, coder->id, "has taken a dongle");
+	return (acquired);
 }
 
 static void	release_dongle(t_dongle *dongle)
@@ -177,23 +173,13 @@ static void	release_dongle(t_dongle *dongle)
 }
 
 /*
-** take_both_dongles — adquisicion dual sin hold-and-wait ni TOCTOU.
-**
-** Algoritmo:
-**   1. Espera bloqueante sobre el PRIMER dongle (no retiene nada mientras
-**      espera, asi que no hay hold-and-wait en esta fase).
-**   2. Intenta trylock inmediato sobre el SEGUNDO.
-**      - Si tiene exito: ambos adquiridos, sin race posible porque
-**        try_take_dongle comprueba Y adquiere bajo el mismo mutex.
-**      - Si falla: libera el primero inmediatamente → vuelve al estado
-**        "sin recursos retenidos" → backoff aleatorio → reintento.
-**
-** El backoff aleatorio (no fijo) rompe la sincronizacion colectiva
-** que causaria livelock si todos los coders reintentaran en el mismo tick.
-**
-** La alternancia par/impar en el orden first/second reduce la probabilidad
-** de contention en el caso comun, pero no es la barrera contra deadlock —
-** esa es la garantia de "nunca retengo uno esperando otro".
+** FIX PROBLEMA 4:
+** Backoff exponencial con cap para prevenir starvation en reintentos.
+** backoff empieza en 200+offset_por_id para desincronizar coders vecinos,
+** se duplica en cada fallo (presión creciente → menor contención),
+** y se limita a 8000µs para no degradar latencia de burnout.
+** El offset basado en id garantiza que dos coders vecinos nunca empiezan
+** en el mismo punto del ciclo de backoff.
 */
 static int	take_both_dongles(t_coders *coder)
 {
@@ -201,8 +187,7 @@ static int	take_both_dongles(t_coders *coder)
 	t_dongle	*second;
 	long		backoff;
 
-	if (coder->data->number_of_coders == 1)
-		return (wait_for_dongle(coder, coder->right));
+
 	if (coder->id % 2 == 0)
 	{
 		first = coder->left;
@@ -213,7 +198,7 @@ static int	take_both_dongles(t_coders *coder)
 		first = coder->right;
 		second = coder->left;
 	}
-	backoff = 200 + (coder->id * 137) % 600;
+	backoff = 200 + (coder->id * 137) % 400;
 	while (1)
 	{
 		if (is_sim_over(coder->data))
@@ -226,7 +211,8 @@ static int	take_both_dongles(t_coders *coder)
 		if (is_sim_over(coder->data))
 			return (0);
 		usleep(backoff);
-		backoff = 200 + (backoff * 3 + coder->id * 71) % 600;
+		if (backoff < 8000)
+			backoff *= 2;
 	}
 }
 
@@ -259,8 +245,7 @@ void	*coder_routine(void *arg)
 		coder->compilation_count++;
 		pthread_mutex_unlock(&data->sim_mutex);
 		release_dongle(coder->right);
-		if (data->number_of_coders > 1)
-			release_dongle(coder->left);
+		release_dongle(coder->left);
 		print_status(data, coder->id, "is debugging");
 		usleep(data->time_to_debug * 1000);
 		print_status(data, coder->id, "is refactoring");
