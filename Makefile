@@ -4,12 +4,14 @@ CFLAGS      = -Wall -Wextra -Werror -pthread
 
 # Tu lista de archivos fuente ajustada
 SRC         = main.c \
-              coders/coder_routine.c \
-              coders/init_variables.c \
-              coders/parsing.c \
-              coders/parsing_utils.c \
-	      coders/monitor_routine.c \
-	      coders/heap_utils.c
+              coders/coder/coder_routine.c \
+              coders/initialization/init_variables.c \
+	      coders/initialization/init_simulation.c \
+              coders/parsing/parsing.c \
+              coders/parsing/parsing_utils.c \
+	      coders/monitor/monitor_routine.c \
+	      coders/heap/heap_utils.c \
+	      coders/heap/heap_sift.c
 
 OBJ_DIR     = obj
 # Esta línea transforma 'coders/archivo.c' en 'obj/coders/archivo.o'

@@ -5,8 +5,8 @@
 /*                                                    +:+ +:+         +:+     */
 /*   By: kcastro- <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
-/*   Created: 2026/05/02 21:01:18 by kcastro-          #+#    #+#             */
-/*   Updated: 2026/05/02 21:01:21 by kcastro-         ###   ########.fr       */
+/*   Created: 2026/05/12 20:35:40 by kcastro-          #+#    #+#             */
+/*   Updated: 2026/05/12 20:35:44 by kcastro-         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -16,7 +16,8 @@ int	has_priority(t_waiter a, t_waiter b)
 {
 	if (a.timestamp < b.timestamp)
 		return (1);
-	if (a.timestamp == b.timestamp && a.coder_id < b.coder_id)
+	if (a.timestamp == b.timestamp
+		&& a.coder_id < b.coder_id)
 		return (1);
 	return (0);
 }
@@ -30,53 +31,6 @@ t_waiter	heap_peek(t_heap *heap)
 	if (heap->size == 0)
 		return (empty);
 	return (heap->waiters[0]);
-}
-
-static void	heap_sift_down(t_heap *heap, int i)
-{
-	int		smallest;
-	int		left;
-	int		right;
-	t_waiter	tmp;
-
-	while (1)
-	{
-		left = 2 * i + 1;
-		right = 2 * i + 2;
-		smallest = i;
-		if (left < heap->size
-			&& has_priority(heap->waiters[left], heap->waiters[smallest]))
-			smallest = left;
-		if (right < heap->size
-			&& has_priority(heap->waiters[right], heap->waiters[smallest]))
-			smallest = right;
-		if (smallest == i)
-			break ;
-		tmp = heap->waiters[i];
-		heap->waiters[i] = heap->waiters[smallest];
-		heap->waiters[smallest] = tmp;
-		i = smallest;
-	}
-}
-
-static void	heap_sift_up(t_heap *heap, int i)
-{
-	int		parent;
-	t_waiter	tmp;
-
-	while (i > 0)
-	{
-		parent = (i - 1) / 2;
-		if (has_priority(heap->waiters[i], heap->waiters[parent]))
-		{
-			tmp = heap->waiters[i];
-			heap->waiters[i] = heap->waiters[parent];
-			heap->waiters[parent] = tmp;
-			i = parent;
-		}
-		else
-			break ;
-	}
 }
 
 t_waiter	heap_extract_min(t_heap *heap)
