@@ -5,6 +5,8 @@ CFLAGS      = -Wall -Wextra -Werror -pthread
 # Tu lista de archivos fuente ajustada
 SRC         = main.c \
               coders/coder/coder_routine.c \
+	      coders/coder/dongle_logic.c \
+	      coders/coder/coder_utils.c \
               coders/initialization/init_variables.c \
 	      coders/initialization/init_simulation.c \
               coders/parsing/parsing.c \

@@ -86,6 +86,13 @@ typedef struct s_coders
 	t_data				*data;
 }						t_coders;
 
+void					print_status(t_data *data, int id, char *status);
+int						is_sim_over(t_data *data);
+long					make_ticket_timestamp(t_coders *coder);
+int						try_take_dongle(t_coders *coder, t_dongle *dongle);
+void					release_dongle(t_dongle *dongle);
+int						dongle_is_acquirable(t_dongle *dongle, t_coders *coder);
+int						wait_for_dongle(t_coders *coder, t_dongle *dongle);
 int						has_priority(t_waiter a, t_waiter b);
 t_waiter				heap_peek(t_heap *heap);
 t_waiter				heap_extract_min(t_heap *heap);
