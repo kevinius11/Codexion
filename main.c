@@ -17,8 +17,8 @@ int main(int argc, char **argv)
 	t_data data;
 	int i;
 	pthread_t monitor;
- 
-   	if (parse_args(argc, argv, &data) != 0)
+	
+	if (parse_args(argc, argv, &data) != 0)
     	{
         	printf("ERROR: El parseo falló. Revisa los valores introducidos.\n");
         	return (1);

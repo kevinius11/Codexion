@@ -12,15 +12,6 @@
 
 #include "codexion.h"
 
-/*
-** FIX PROBLEMA 1:
-** log_mutex y sim_mutex se adquieren SIEMPRE en el mismo orden:
-**   log_mutex → sim_mutex
-** Esto elimina la ventana entre "comprobé simulation_over" y "hice printf"
-** donde el monitor podía activar simulation_over y el coder imprimía igual.
-** Al mantener ambos locks durante el printf, o imprimimos dentro de la
-** simulación activa, o no imprimimos en absoluto. Sin ventana posible.
-*/
 void	print_status(t_data *data, int id, char *status)
 {
 	pthread_mutex_lock(&data->log_mutex);
@@ -70,23 +61,6 @@ static int	dongle_is_acquirable(t_dongle *dongle, t_coders *coder)
 	return (1);
 }
 
-/*
-** FIX PROBLEMA 2 y 3:
-** Ticket ownership explícito con flag 'inserted'.
-** El ticket se inserta UNA SOLA VEZ y se elimina exactamente una vez,
-** siempre con heap_remove_by_id(coder->id), nunca con heap_extract_min.
-**
-** ¿Por qué heap_remove_by_id en vez de heap_extract_min en el caso exitoso?
-** heap_extract_min asume que "si soy adquirible, soy el top del heap".
-** Aunque dongle_is_acquirable comprueba heap_peek == coder->id antes de
-** adquirir, cualquier corrupción futura podría extraer el ticket de otro
-** coder. heap_remove_by_id busca por ID explícito: sabemos quiénes somos,
-** no necesitamos asumir que seguimos siendo el mínimo en el instante exacto
-** de la extracción.
-**
-** El flag 'inserted' garantiza que no haya doble-remove si el hilo
-** es cancelado por simulation_over en ramas distintas del bucle.
-*/
 static int	wait_for_dongle(t_coders *coder, t_dongle *dongle)
 {
 	t_waiter		ticket;
@@ -172,22 +146,24 @@ static void	release_dongle(t_dongle *dongle)
 	pthread_mutex_unlock(&dongle->mutex);
 }
 
-/*
-** FIX PROBLEMA 4:
-** Backoff exponencial con cap para prevenir starvation en reintentos.
-** backoff empieza en 200+offset_por_id para desincronizar coders vecinos,
-** se duplica en cada fallo (presión creciente → menor contención),
-** y se limita a 8000µs para no degradar latencia de burnout.
-** El offset basado en id garantiza que dos coders vecinos nunca empiezan
-** en el mismo punto del ciclo de backoff.
-*/
 static int	take_both_dongles(t_coders *coder)
 {
 	t_dongle	*first;
 	t_dongle	*second;
 	long		backoff;
 
-
+	if (coder->data->number_of_coders == 1)
+	{
+		if (!wait_for_dongle(coder, coder->right))
+			return (0);
+		pthread_mutex_lock(&coder->data->compile_mutex);
+		while (!is_sim_over(coder->data))
+			pthread_cond_wait(&coder->data->compile_cond,
+				&coder->data->compile_mutex);
+		pthread_mutex_unlock(&coder->data->compile_mutex);
+		release_dongle(coder->right);
+		return (0);
+	}
 	if (coder->id % 2 == 0)
 	{
 		first = coder->left;

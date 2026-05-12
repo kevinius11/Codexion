@@ -120,6 +120,8 @@ int init_simulation_dynamic(t_data *data)
 
 		data->coders[i].right = &data->dongles[i];
 		data->coders[i].left = &data->dongles[(i - 1 + data->number_of_coders) % data->number_of_coders];
+		if (data->number_of_coders == 1)
+			data->coders[i].left = NULL;
 
 		data->coders[i].compilation_count = 0;
 		data->coders[i].last_compilation = data->start_time;

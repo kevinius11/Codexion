@@ -24,6 +24,9 @@ static void	broadcast_all_dongles(t_data *data)
 		pthread_mutex_unlock(&data->dongles[i].mutex);
 		i++;
 	}
+	pthread_mutex_lock(&data->compile_mutex);
+	pthread_cond_broadcast(&data->compile_cond);
+	pthread_mutex_unlock(&data->compile_mutex);
 }
 
 /*

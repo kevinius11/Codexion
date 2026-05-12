@@ -83,7 +83,7 @@ int parse_args(int argc, char **argv, t_data *data)
     		long number_of_compiles_required = ft_atoi_long(argv[6]);
     		long dongle_cooldown = ft_atoi_long(argv[7]);
 
-		if (coders < 2)
+		if (coders <= 0)
 			return (-1);
 		data->number_of_coders = coders;
 
