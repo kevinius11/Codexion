@@ -9,7 +9,6 @@
 /*   Updated: 2026/05/01 19:26:44 by kcastro-         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
-
 #include "codexion.h"
 
 static void	broadcast_all_dongles(t_data *data)
@@ -24,21 +23,16 @@ static void	broadcast_all_dongles(t_data *data)
 		pthread_mutex_unlock(&data->dongles[i].mutex);
 		i++;
 	}
-	pthread_mutex_lock(&data->compile_mutex);
-	pthread_cond_broadcast(&data->compile_cond);
-	pthread_mutex_unlock(&data->compile_mutex);
 }
 
 static int	handle_burnout(t_data *data, int i)
 {
 	data->simulation_over = 1;
-	pthread_mutex_unlock(&data->sim_mutex);
 	pthread_mutex_lock(&data->log_mutex);
-	pthread_mutex_lock(&data->sim_mutex);
 	printf("%ld %d burned out\n", get_time_ms() - data->start_time,
 		data->coders[i].id);
-	pthread_mutex_unlock(&data->sim_mutex);
 	pthread_mutex_unlock(&data->log_mutex);
+	pthread_mutex_unlock(&data->sim_mutex);
 	broadcast_all_dongles(data);
 	return (1);
 }
@@ -91,6 +85,7 @@ void	*monitor_routine(void *arg)
 		if (check_simulation(data))
 			return (NULL);
 		pthread_mutex_unlock(&data->sim_mutex);
+		broadcast_all_dongles(data);
 		usleep(2000);
 	}
 	return (NULL);

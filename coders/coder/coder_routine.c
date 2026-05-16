@@ -29,25 +29,25 @@ static void	perform_actions(t_coders *coder, t_data *data)
 
 static int	handle_single_coder(t_coders *coder)
 {
-	if (!wait_for_dongle(coder, coder->right))
+	if (!wait_for_dongle(coder, coder->right, make_ticket_timestamp(coder)))
 		return (0);
-	pthread_mutex_lock(&coder->data->compile_mutex);
-	while (!is_sim_over(coder->data))
-		pthread_cond_wait(&coder->data->compile_cond,
-			&coder->data->compile_mutex);
-	pthread_mutex_unlock(&coder->data->compile_mutex);
+	while (!coder->data->simulation_over)
+		usleep(1000);
 	release_dongle(coder->right);
 	return (0);
 }
 
 static void	assign_dongles(t_coders *coder, t_dongle **f, t_dongle **s)
 {
-	*f = coder->right;
-	*s = coder->left;
 	if (coder->id % 2 == 0)
 	{
 		*f = coder->left;
 		*s = coder->right;
+	}
+	else
+	{
+		*f = coder->right;
+		*s = coder->left;
 	}
 }
 
@@ -56,16 +56,18 @@ int	take_both_dongles(t_coders *coder)
 	t_dongle	*f;
 	t_dongle	*s;
 	long		b;
+	long		priority;
 
 	if (coder->data->number_of_coders == 1)
 		return (handle_single_coder(coder));
 	assign_dongles(coder, &f, &s);
+	priority = make_ticket_timestamp(coder);
 	b = 200 + (coder->id * 137) % 400;
-	while (!is_sim_over(coder->data))
+	while (!coder->data->simulation_over)
 	{
-		if (!wait_for_dongle(coder, f))
+		if (!wait_for_dongle(coder, f, priority))
 			return (0);
-		if (try_take_dongle(coder, s))
+		if (try_take_dongle(coder, s, priority))
 			return (1);
 		release_dongle(f);
 		usleep(b);
@@ -95,9 +97,7 @@ void	*coder_routine(void *arg)
 		pthread_mutex_unlock(&data->sim_mutex);
 		if (!take_both_dongles(coder))
 			break ;
-		pthread_mutex_lock(&data->sim_mutex);
 		coder->last_compilation = get_time_ms();
-		pthread_mutex_unlock(&data->sim_mutex);
 		perform_actions(coder, data);
 	}
 	return (NULL);

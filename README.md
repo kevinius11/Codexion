@@ -1,5 +1,3 @@
-*Este proyecto ha sido creado como parte del currículo de 42 por kcastro-.*
-
 # Codexion
 
 ## Descripción
@@ -59,7 +57,7 @@ El sistema soporta dos políticas de scheduling:
 
 ### FIFO
 
-Prioriza al coder que llegó primero a la cola de espera.
+Prioriza al coder que llegó primero a la cola de espera. El timestamp del ticket se calcula **una sola vez** al inicio de cada ciclo de compilación y se mantiene constante durante todos los reintentos, garantizando orden justo de llegada.
 
 ### EDF (Earliest Deadline First)
 
@@ -68,6 +66,8 @@ Prioriza al coder más cercano al burnout utilizando deadlines dinámicos:
 ```text
 deadline = last_compilation + time_to_burnout
 ```
+
+El deadline también se calcula **una sola vez** por ciclo y se propaga a todos los intentos de adquisición, evitando que reintentos tardíos penalicen al coder con menor prioridad real.
 
 ---
 
@@ -81,7 +81,7 @@ t_heap queue;
 
 La prioridad se calcula mediante:
 
-- timestamp
+- timestamp (FIFO: tiempo de llegada / EDF: deadline)
 - coder_id (tie-break)
 
 ### Complejidades
@@ -96,13 +96,33 @@ La prioridad se calcula mediante:
 
 ## Backoff Exponencial
 
-Para reducir contention y retry storms:
+Para reducir contention y retry storms cuando el segundo dongle no está disponible:
 
 ```text
-200µs → 400µs → 800µs → ...
+200µs → 400µs → 800µs → ... → 8000µs (máximo)
+```
+
+El backoff es único por coder basado en su id:
+
+```text
+b = 200 + (coder_id * 137) % 400
 ```
 
 Esto evita sincronización accidental entre hilos y mejora fairness.
+
+---
+
+## Adquisición atómica de dos recursos
+
+La adquisición de los dos dongles sigue el patrón try-and-release:
+
+```text
+1. wait_for_dongle(primero)   ← bloquea hasta obtenerlo
+2. try_take_dongle(segundo)   ← intento no bloqueante
+3. si falla → release(primero) + backoff + reintentar
+```
+
+Esto elimina el hold-and-wait — condición necesaria para deadlock.
 
 ---
 
@@ -143,7 +163,7 @@ make
 ## Ejemplo EDF
 
 ```bash
-./codexion 100 300 50 50 50 1 50 edf
+./codexion 5 1200 200 100 100 7 50 edf
 ```
 
 ---
@@ -168,7 +188,7 @@ Esto:
 ## Mostrar únicamente burnouts
 
 ```bash
-./codexion 100 300 50 50 50 1 50 edf | grep burned
+./codexion 5 100 200 100 100 7 50 fifo | grep burned
 ```
 
 ---
@@ -176,7 +196,7 @@ Esto:
 ## Contar burnouts
 
 ```bash
-./codexion 100 300 50 50 50 1 50 edf | grep -c burned
+./codexion 5 100 200 100 100 7 50 fifo | grep -c burned
 ```
 
 ---
@@ -184,7 +204,7 @@ Esto:
 ## Mostrar únicamente compilaciones
 
 ```bash
-./codexion 100 300 50 50 50 1 50 edf | grep "is compiling"
+./codexion 5 1200 200 100 100 7 50 edf | grep "is compiling"
 ```
 
 ---
@@ -192,7 +212,7 @@ Esto:
 ## Estadísticas de compilación por coder
 
 ```bash
-./codexion 100 300 50 50 50 1 50 edf \
+./codexion 5 1200 200 100 100 7 50 edf \
 | awk '/is compiling/{count[$2]++} END {for (i in count) print "Coder", i, "compiled", count[i], "times"}'
 ```
 
@@ -201,7 +221,7 @@ Esto:
 ## Ordenar coders más activos
 
 ```bash
-./codexion 100 300 50 50 50 1 50 edf \
+./codexion 5 1200 200 100 100 7 50 edf \
 | awk '/is compiling/{count[$2]++} END {for (i in count) print count[i], i}' \
 | sort -nr
 ```
@@ -211,7 +231,7 @@ Esto:
 ## Ver únicamente adquisición de dongles
 
 ```bash
-./codexion 100 300 50 50 50 1 50 edf \
+./codexion 5 1200 200 100 100 7 50 edf \
 | grep "has taken a dongle"
 ```
 
@@ -220,7 +240,7 @@ Esto:
 ## Medir duración total
 
 ```bash
-time ./codexion 100 300 50 50 50 1 50 edf
+time ./codexion 5 1200 200 100 100 7 50 edf
 ```
 
 ---
@@ -229,13 +249,20 @@ time ./codexion 100 300 50 50 50 1 50 edf
 
 ## Deadlock Prevention
 
-El sistema rompe explícitamente la condición de *Circular Wait* de Coffman mediante adquisición asimétrica de recursos:
+El sistema elimina la condición de *Hold and Wait* de Coffman mediante el patrón try-and-release:
+
+```text
+1. Adquirir primer dongle (bloqueante)
+2. Intentar adquirir segundo dongle (no bloqueante)
+3. Si falla → liberar el primero inmediatamente
+4. Backoff exponencial → reintentar
+```
+
+Nunca se retienen recursos mientras se espera otro. Adicionalmente, la asignación asimétrica rompe posibles ciclos:
 
 | Coders pares | Coders impares |
 |---|---|
 | LEFT → RIGHT | RIGHT → LEFT |
-
-Esto impide ciclos completos de espera.
 
 ---
 
@@ -243,55 +270,54 @@ Esto impide ciclos completos de espera.
 
 EDF reduce la probabilidad de starvation priorizando coders cercanos al burnout.
 
+El priority ticket se calcula una sola vez por ciclo — los reintentos no penalizan al coder con deadline más urgente.
+
 Además:
 
-- se implementa fairness parcial
-- existe cooldown de dongles
-- se utiliza backoff exponencial
+- se implementa fairness mediante heap de prioridad por dongle
+- existe cooldown de dongles para distribución equitativa
+- el monitor hace broadcast periódico cada 2ms para despertar coders bloqueados por cooldown
 
 ---
 
 ## Dongle Cooldown Management
 
-Cada dongle posee un cooldown configurable:
+Cada dongle posee un cooldown configurable verificado en `dongle_is_acquirable`:
 
 ```text
-last_used_time + cooldown
+elapsed = now - last_used_time
+si elapsed < dongle_cooldown → no disponible
 ```
 
-Esto:
-
-- evita reutilización inmediata
-- reduce monopolización
-- mejora distribución de recursos
+El monitor hace `broadcast_all_dongles` periódicamente para despertar a los coders que esperan a que el cooldown expire, evitando esperas indefinidas sin `pthread_cond_timedwait`.
 
 ---
 
 ## Precise Burnout Detection
 
-El monitor thread verifica constantemente:
+El monitor thread verifica constantemente con un ciclo de 2ms:
 
 ```text
-current_time - last_compilation
+current_time - last_compilation > time_to_burnout → burnout
 ```
 
-La detección ocurre de manera thread-safe mediante `sim_mutex`.
+La detección ocurre de manera thread-safe mediante `sim_mutex`. El mensaje de burnout se imprime dentro de los 10ms requeridos.
 
 ---
 
 ## Serialized Logging
 
-Todos los logs utilizan:
+Todos los logs utilizan orden fijo de adquisición de mutexes:
 
 ```c
-pthread_mutex_t log_mutex;
+pthread_mutex_lock(&data->sim_mutex);
+pthread_mutex_lock(&data->log_mutex);
+// imprimir
+pthread_mutex_unlock(&data->log_mutex);
+pthread_mutex_unlock(&data->sim_mutex);
 ```
 
-Esto evita:
-
-- corrupción de stdout
-- interleaving
-- mensajes parciales
+El orden `sim_mutex → log_mutex` es consistente en todos los hilos, eliminando deadlocks cruzados entre monitor y coders.
 
 ---
 
@@ -299,20 +325,19 @@ Esto evita:
 
 ## pthread_mutex_t
 
-El proyecto utiliza múltiples mutexes especializados:
+El proyecto utiliza mutexes especializados con orden de adquisición estricto:
 
-| Mutex | Función |
-|---|---|
-| sim_mutex | Estado global |
-| log_mutex | Serialización de logs |
-| dongle->mutex | Protección del recurso |
-| compile_mutex | Coordinación especial |
+| Mutex | Función | Orden |
+|---|---|---|
+| sim_mutex | Estado global de simulación | 1º |
+| log_mutex | Serialización de logs | 2º |
+| dongle->mutex | Protección del recurso y su heap | independiente |
+
+El orden `sim_mutex → log_mutex` nunca se invierte, eliminando deadlocks cruzados detectados por helgrind.
 
 ---
 
 ## Protección de Secciones Críticas
-
-Ejemplo:
 
 ```c
 pthread_mutex_lock(&data->sim_mutex);
@@ -320,15 +345,18 @@ coder->compilation_count++;
 pthread_mutex_unlock(&data->sim_mutex);
 ```
 
-Esto evita race conditions sobre:
+Campos protegidos por `sim_mutex`:
 
-- compilation_count
-- simulation_over
-- last_compilation
+- `compilation_count`
+- `simulation_over`
+
+Campos de escritura exclusiva (sin mutex necesario):
+
+- `last_compilation` — solo escribe el hilo propietario
 
 ---
 
-# pthread_cond_t
+## pthread_cond_t
 
 Cada dongle posee:
 
@@ -336,17 +364,7 @@ Cada dongle posee:
 pthread_cond_t cond;
 ```
 
-Los coders esperan eficientemente mediante:
-
-```c
-pthread_cond_wait()
-```
-
-o:
-
-```c
-pthread_cond_timedwait()
-```
+Los coders esperan eficientemente mediante `pthread_cond_wait` exclusivamente — se eliminó `pthread_cond_timedwait` por producir falsos positivos en helgrind. El monitor suple esta funcionalidad haciendo broadcast periódico.
 
 ---
 
@@ -355,15 +373,19 @@ pthread_cond_timedwait()
 El flujo de comunicación es:
 
 ```text
-coder espera
+coder inserta ticket en heap del dongle
 ↓
-dongle liberado
+coder espera con pthread_cond_wait
 ↓
-broadcast
+dongle liberado → release_dongle → broadcast
+o monitor → broadcast_all_dongles cada 2ms
 ↓
 coder despierta
 ↓
-reevaluación de prioridad
+reevaluación: dongle_is_acquirable()
+↓
+si es el primero del heap y cooldown pasó → toma el dongle
+si no → vuelve a cond_wait
 ```
 
 ---
@@ -372,28 +394,25 @@ reevaluación de prioridad
 
 El monitor thread:
 
-- supervisa burnout
-- detecta finalización global
-- despierta todos los hilos bloqueados
-
-Utilizando:
-
-```c
-pthread_cond_broadcast()
-```
+- supervisa burnout de cada coder cada 2ms
+- detecta finalización global cuando todos completaron `number_of_compiles_required`
+- despierta todos los hilos bloqueados con `broadcast_all_dongles`
+- imprime el mensaje de burnout con `log_mutex` sin tener `sim_mutex` simultáneamente
 
 ---
 
 # Race Condition Avoidance
 
-Todas las estructuras compartidas están protegidas mediante mutexes:
+Todas las estructuras compartidas están protegidas con orden consistente:
 
 | Recurso | Protección |
 |---|---|
-| heap queue | dongle mutex |
-| logs | log mutex |
-| simulation flags | sim mutex |
-| timestamps | sim mutex |
+| heap queue | dongle->mutex (siempre tomado al operar el heap) |
+| logs | sim_mutex → log_mutex (orden fijo) |
+| simulation_over | sim_mutex |
+| compilation_count | sim_mutex |
+| last_compilation | escritura exclusiva del hilo propietario |
+| available, last_used_time | dongle->mutex |
 
 ---
 
@@ -412,7 +431,7 @@ Todas las estructuras compartidas están protegidas mediante mutexes:
 ## Temas relacionados
 
 - Dining Philosophers Problem
-- Deadlock Prevention
+- Deadlock Prevention (condiciones de Coffman)
 - Earliest Deadline First Scheduling
 - Condition Variables
 - Shared Memory Concurrency
@@ -440,6 +459,7 @@ Se utilizó IA como herramienta de apoyo técnico para:
 - documentación técnica
 - diseño de scheduling
 - explicación teórica de synchronization primitives
+- detección y diagnóstico de race conditions con helgrind
 - discusión de posibles mejoras futuras
 
 La implementación, debugging, diseño concurrente y desarrollo principal del sistema fueron realizados manualmente.

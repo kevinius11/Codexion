@@ -9,7 +9,6 @@
 /*   Updated: 2026/05/12 20:28:25 by kcastro-         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
-
 #include "codexion.h"
 
 long	get_time_ms(void)
@@ -26,12 +25,7 @@ int	init_data(t_data *data)
 		return (-1);
 	if (pthread_mutex_init(&data->sim_mutex, NULL) != 0)
 		return (-1);
-	if (pthread_mutex_init(&data->compile_mutex, NULL) != 0)
-		return (-1);
-	if (pthread_cond_init(&data->compile_cond, NULL) != 0)
-		return (-1);
 	data->simulation_over = 0;
-	data->compiling_count = 0;
 	data->start_time = get_time_ms();
 	return (0);
 }
@@ -45,7 +39,8 @@ static void	free_dongles(t_data *data, int count)
 	{
 		pthread_cond_destroy(&data->dongles[i].cond);
 		pthread_mutex_destroy(&data->dongles[i].mutex);
-		free(data->dongles[i].queue.waiters);
+		if (data->dongles[i].queue.waiters)
+			free(data->dongles[i].queue.waiters);
 		i++;
 	}
 }
@@ -57,9 +52,10 @@ void	free_resources(t_data *data, int count)
 	free_dongles(data, count);
 	pthread_mutex_destroy(&data->log_mutex);
 	pthread_mutex_destroy(&data->sim_mutex);
-	pthread_mutex_destroy(&data->compile_mutex);
-	pthread_cond_destroy(&data->compile_cond);
-	free(data->threads);
-	free(data->dongles);
-	free(data->coders);
+	if (data->threads)
+		free(data->threads);
+	if (data->dongles)
+		free(data->dongles);
+	if (data->coders)
+		free(data->coders);
 }
