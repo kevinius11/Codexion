@@ -97,7 +97,9 @@ void	*coder_routine(void *arg)
 		pthread_mutex_unlock(&data->sim_mutex);
 		if (!take_both_dongles(coder))
 			break ;
+		pthread_mutex_lock(&data->sim_mutex);
 		coder->last_compilation = get_time_ms();
+		pthread_mutex_unlock(&data->sim_mutex);
 		perform_actions(coder, data);
 	}
 	return (NULL);
